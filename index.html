@@ -6,16 +6,6 @@
 <meta name="theme-color" content="#0B1220">
 <title>ShiftFlow — Shift Work Calendar</title>
 <meta name="description" content="ShiftFlow is a simple, fast shift work calendar for nurses, police, firefighters and factory workers. Build your rotation, see your month, track your hours.">
-<!--
-  ============================================================
-  ShiftFlow — App #1 (prototype / App-Store-ready shell)
-  ------------------------------------------------------------
-  • 100% offline: all data lives on the device (localStorage)
-  • No accounts, no servers, no tracking
-  • AdMob slots are marked with  id="ad-banner"  and  id="ad-native"
-    (a native SDK ad will replace these placeholders at packaging time)
-  ============================================================
--->
 <style>
   :root{
     --bg:#0B1220; --card:#131C2E; --card-2:#1B2740; --text:#E8EEF9; --muted:#8FA0BF;
@@ -308,8 +298,11 @@
         <h2>About ShiftFlow</h2>
         <p class="note">
           Built for people who don't work 9 to 5 — nurses, officers, firefighters, factory and warehouse crews.
-          Offline first, no account, no ads that interrupt your day.<br><br>
-          Version 1.0.0
+          Offline first, no account, light non-blocking ads only.<br><br>
+          Version 1.0.0<br><br>
+          Planning a <b>Panama rotation</b>? Use the free
+          <a href="panama-schedule-calculator.html" style="color:var(--accent)">Panama Schedule Calculator</a>
+          to build the 28-day cycle and export it to your calendar.
         </p>
       </div>
     </section>
@@ -344,7 +337,7 @@
     { label:"2 Days · 2 Nights · 4 Off", pattern:"DDNNOOOO" },
     { label:"4 On · 4 Off",             pattern:"DDDDOOOO" },
     { label:"7 On · 7 Off",             pattern:"DDDDDDDOOOOOOO" },
-    { label:"Panama (2-2-3)",           pattern:"DDNNOO" },
+    { label:"Panama (2-2-3)",           pattern:"DDOODDDOODDOOO" },
     { label:"Day · Evening · Night · Off", pattern:"DENOOO" },
     { label:"5 Days · 2 Off",           pattern:"DDDDDOO" }
   ];
@@ -371,6 +364,8 @@
       var parsed = JSON.parse(raw);
       var base = defaultState();
       for(var k in base){ if(!(k in parsed)) parsed[k] = base[k]; }
+      if(!parsed.hours) parsed.hours = base.hours;
+      if(!parsed.overrides) parsed.overrides = {};
       return parsed;
     }catch(e){ return defaultState(); }
   }
@@ -410,6 +405,11 @@
     var idx = ((diff % pat.length) + pat.length) % pat.length;
     return pat.charAt(idx);
   }
+  function hoursFor(code){
+    var h = state.hours || {};
+    var v = Number(h[code]);
+    return isFinite(v) ? v : 0;
+  }
 
   /* ---------------- current view ---------------- */
   var cursor = (function(){ var t = new Date(); return { y:t.getFullYear(), m:t.getMonth() }; })();
@@ -442,4 +442,312 @@
       var d = new Date(cursor.y, cursor.m, i);
       var code = shiftForDate(d);
       var k = iso(d);
-      var cl
+      var cls = "day";
+      if(code) cls += " s-" + code;
+      if(k === todayISO) cls += " today";
+      var label = code ? code : "·";
+      var hrs = "";
+      if(code && (code === "D" || code === "E" || code === "N")) hrs = '<span class="hrs">' + hoursFor(code) + "h</span>";
+      var dot = Object.prototype.hasOwnProperty.call(state.overrides,k) ? '<span class="dot"></span>' : "";
+      html += '<div class="' + cls + '" data-date="' + k + '">' +
+                '<span class="num">' + i + '</span>' +
+                '<span class="code">' + label + '</span>' + hrs + dot +
+              '</div>';
+    }
+    grid.innerHTML = html;
+
+    var cells = grid.querySelectorAll(".day:not(.pad)");
+    for(var j=0;j<cells.length;j++){
+      cells[j].addEventListener("click", function(ev){
+        var el = ev.currentTarget;
+        openSheet(el.getAttribute("data-date"));
+      });
+    }
+  }
+
+  function renderLegend(){
+    var el = document.getElementById("legend");
+    var html = "";
+    TYPES.forEach(function(t){
+      html += '<i><b style="background:var(' + t.varName + ')"></b>' + t.name + '</i>';
+    });
+    el.innerHTML = html;
+  }
+
+  function renderStats(){
+    var daysInMonth = new Date(cursor.y, cursor.m+1, 0).getDate();
+    var counts = { D:0, E:0, N:0, L:0, O:0 };
+    var hours = 0, shifts = 0;
+
+    for(var i=1;i<=daysInMonth;i++){
+      var d = new Date(cursor.y, cursor.m, i);
+      var code = shiftForDate(d);
+      if(!code) continue;
+      counts[code] = (counts[code] || 0) + 1;
+      if(code !== "O") shifts++;
+      if(code === "D" || code === "E" || code === "N") hours += hoursFor(code);
+    }
+
+    document.getElementById("statShifts").textContent = String(shifts);
+    document.getElementById("statHours").textContent = String(hours);
+
+    var box = document.getElementById("statsBreakdown");
+    var html = "";
+    TYPES.forEach(function(t){
+      if(!counts[t.code]) return;
+      var h = (t.code === "D" || t.code === "E" || t.code === "N") ? (hoursFor(t.code) * counts[t.code]) : 0;
+      html += '<div class="statrow">' +
+                '<div class="lbl"><b style="background:var(' + t.varName + ')"></b>' + t.name + '</div>' +
+                '<div class="val">' + counts[t.code] + (counts[t.code] === 1 ? " day" : " days") + (h ? " · " + h + " h" : "") + '</div>' +
+              '</div>';
+    });
+    if(!html) html = '<p class="note">No shifts in this month yet.</p>';
+    box.innerHTML = html;
+
+    var pat = cleanPattern(state.pattern);
+    var summary = document.getElementById("patternSummary");
+    if(!pat){
+      summary.textContent = "No rotation set yet.";
+      return;
+    }
+    var pc = {};
+    for(var i2=0;i2<pat.length;i2++){
+      var c = pat.charAt(i2);
+      pc[c] = (pc[c] || 0) + 1;
+    }
+    var parts = [];
+    TYPES.forEach(function(t){
+      if(pc[t.code]) parts.push(t.name + " ×" + pc[t.code]);
+    });
+    summary.textContent = "Your cycle is " + pat.length + " days (" + parts.join(", ") + ") and repeats every " + pat.length + " days.";
+  }
+
+  function renderPresets(){
+    var row = document.getElementById("presetRow");
+    var html = "";
+    PRESETS.forEach(function(p){
+      html += '<button type="button" class="chip" data-pattern="' + p.pattern + '">' + p.label + '</button>';
+    });
+    row.innerHTML = html;
+    var chips = row.querySelectorAll(".chip");
+    for(var i=0;i<chips.length;i++){
+      chips[i].addEventListener("click", function(ev){
+        document.getElementById("patternInput").value = ev.currentTarget.getAttribute("data-pattern");
+        applyPattern();
+      });
+    }
+  }
+
+  function renderPatternPreview(){
+    var box = document.getElementById("patternPreview");
+    var pat = cleanPattern(state.pattern);
+    var html = "";
+    for(var i=0;i<pat.length;i++){
+      var c = pat.charAt(i);
+      var color = TYPEMAP[c] ? "var(" + TYPEMAP[c].varName + ")" : "var(--muted)";
+      html += '<i style="color:' + color + ';border-color:' + color + '">' + c + '</i>';
+    }
+    box.innerHTML = html || '<span class="note">No pattern yet.</span>';
+  }
+
+  function renderInputs(){
+    document.getElementById("patternInput").value = cleanPattern(state.pattern);
+    document.getElementById("patternStart").value = state.patternStart;
+    document.getElementById("weekStart").value = String(state.weekStart);
+    document.getElementById("hD").value = hoursFor("D");
+    document.getElementById("hE").value = hoursFor("E");
+    document.getElementById("hN").value = hoursFor("N");
+    document.getElementById("hL").value = hoursFor("L");
+  }
+
+  function renderAll(){
+    renderDOW();
+    renderCalendar();
+    renderLegend();
+    renderStats();
+    renderPatternPreview();
+    renderInputs();
+  }
+
+  /* ---------------- theme ---------------- */
+  function applyTheme(){
+    if(state.theme === "light") document.documentElement.setAttribute("data-theme","light");
+    else document.documentElement.removeAttribute("data-theme");
+  }
+
+  /* ---------------- bottom sheet ---------------- */
+  var sheetDate = null;
+  function openSheet(dateKey){
+    sheetDate = dateKey;
+    var d = parseISO(dateKey);
+    var title = d.toLocaleDateString("en-US",{ weekday:"long", month:"short", day:"numeric" });
+    document.getElementById("sheetTitle").textContent = "Set shift — " + title;
+    var box = document.getElementById("sheetTypes");
+    var html = "";
+    TYPES.forEach(function(t){
+      html += '<button type="button" data-code="' + t.code + '" style="border-color:var(' + t.varName + ');color:var(' + t.varName + ')">' +
+                t.code + '<small>' + t.name + '</small></button>';
+    });
+    box.innerHTML = html;
+    var btns = box.querySelectorAll("button");
+    for(var i=0;i<btns.length;i++){
+      btns[i].addEventListener("click", function(ev){
+        var code = ev.currentTarget.getAttribute("data-code");
+        state.overrides[sheetDate] = code;
+        save();
+        closeSheet();
+        renderAll();
+      });
+    }
+    document.getElementById("sheet").classList.add("open");
+    document.getElementById("scrim").classList.add("show");
+  }
+  function closeSheet(){
+    document.getElementById("sheet").classList.remove("open");
+    document.getElementById("scrim").classList.remove("show");
+  }
+
+  /* ---------------- actions ---------------- */
+  function applyPattern(){
+    var input = document.getElementById("patternInput");
+    var start = document.getElementById("patternStart");
+    state.pattern = cleanPattern(input.value);
+    state.patternStart = start.value || iso(new Date());
+    save();
+    renderAll();
+  }
+
+  function setMonth(y,m){
+    cursor.y = y; cursor.m = m;
+    renderCalendar();
+    renderStats();
+  }
+
+  function download(name, text, mime){
+    var blob = new Blob([text], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+  }
+
+  /* ---------------- events ---------------- */
+  document.getElementById("prevMonth").addEventListener("click", function(){
+    var m = cursor.m - 1, y = cursor.y;
+    if(m < 0){ m = 11; y--; }
+    setMonth(y,m);
+  });
+  document.getElementById("nextMonth").addEventListener("click", function(){
+    var m = cursor.m + 1, y = cursor.y;
+    if(m > 11){ m = 0; y++; }
+    setMonth(y,m);
+  });
+  document.getElementById("todayBtn").addEventListener("click", function(){
+    var t = new Date();
+    setMonth(t.getFullYear(), t.getMonth());
+  });
+
+  document.getElementById("themeBtn").addEventListener("click", function(){
+    state.theme = (state.theme === "light") ? "dark" : "light";
+    save();
+    applyTheme();
+    document.getElementById("themeBtn").textContent = (state.theme === "light") ? "☀️" : "🌙";
+  });
+
+  document.getElementById("applyPattern").addEventListener("click", applyPattern);
+  document.getElementById("patternInput").addEventListener("input", function(){
+    state.pattern = cleanPattern(this.value);
+    save();
+    renderPatternPreview();
+  });
+  document.getElementById("patternStart").addEventListener("change", function(){
+    state.patternStart = this.value || iso(new Date());
+    save();
+    renderCalendar();
+    renderStats();
+  });
+
+  document.getElementById("weekStart").addEventListener("change", function(){
+    state.weekStart = Number(this.value);
+    save();
+    renderDOW();
+    renderCalendar();
+  });
+
+  ["hD","hE","hN","hL"].forEach(function(id){
+    document.getElementById(id).addEventListener("change", function(){
+      var code = id.slice(1);
+      state.hours[code] = Number(this.value) || 0;
+      save();
+      renderCalendar();
+      renderStats();
+    });
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    download("shiftflow-backup.json", JSON.stringify(state, null, 2), "application/json");
+  });
+  document.getElementById("importBtn").addEventListener("click", function(){
+    document.getElementById("importFile").click();
+  });
+  document.getElementById("importFile").addEventListener("change", function(){
+    var f = this.files && this.files[0];
+    if(!f) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var data = JSON.parse(reader.result);
+        state = data;
+        save();
+        applyTheme();
+        renderAll();
+      }catch(e){
+        alert("Could not read that file.");
+      }
+    };
+    reader.readAsText(f);
+  });
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    if(!confirm("Erase all your shifts and settings on this device?")) return;
+    state = defaultState();
+    save();
+    applyTheme();
+    renderAll();
+  });
+
+  document.getElementById("clearDay").addEventListener("click", function(){
+    if(sheetDate){
+      delete state.overrides[sheetDate];
+      save();
+      renderAll();
+    }
+    closeSheet();
+  });
+  document.getElementById("cancelSheet").addEventListener("click", closeSheet);
+  document.getElementById("scrim").addEventListener("click", closeSheet);
+
+  var tabs = document.querySelectorAll(".tab");
+  for(var t=0;t<tabs.length;t++){
+    tabs[t].addEventListener("click", function(ev){
+      var name = ev.currentTarget.getAttribute("data-tab");
+      for(var i=0;i<tabs.length;i++) tabs[i].classList.remove("active");
+      ev.currentTarget.classList.add("active");
+      var panels = document.querySelectorAll(".panel");
+      for(var j=0;j<panels.length;j++){
+        panels[j].classList.toggle("active", panels[j].id === "tab-" + name);
+      }
+    });
+  }
+
+  /* ---------------- init ---------------- */
+  applyTheme();
+  document.getElementById("themeBtn").textContent = (state.theme === "light") ? "☀️" : "🌙";
+  renderPresets();
+  renderAll();
+})();
+</script>
+</body>
+</html>
