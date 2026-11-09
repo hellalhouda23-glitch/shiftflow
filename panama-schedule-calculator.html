@@ -6,9 +6,7 @@
 <title>Panama Schedule Calculator — Free 28-Day Rotating Shift Calendar</title>
 <meta name="description" content="Free Panama schedule calculator. Enter your start date to get a full 28-day rotating shift calendar with day/night shifts, total hours, weekend shifts and calendar (.ics) export.">
 <meta name="robots" content="index,follow">
-<!-- After you publish, set your real URL here:
-<link rel="canonical" href="https://your-domain.com/panama-schedule-calculator/">
--->
+<link rel="canonical" href="https://hellalhouda23-glitch.github.io/shiftflow/panama-schedule-calculator.html">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Panama Schedule Calculator — Free 28-Day Rotating Shift Calendar">
 <meta property="og:description" content="Generate a Panama schedule in seconds: 28-day calendar, total hours, weekend shifts, printable view and .ics export.">
@@ -131,8 +129,8 @@
 <div class="wrap">
 
   <header class="top">
-    <a class="brand" href="/">Shift<span>Flow</span></a>
-    <a class="tool-link" href="https://hellalhouda23-glitch.github.io/shiftflow/">Shift calendar app</a>
+    <a class="brand" href="./">Shift<span>Flow</span></a>
+    <a class="tool-link" href="./">Shift calendar app</a>
   </header>
 
   <h1>Panama Schedule Calculator</h1>
@@ -250,7 +248,7 @@
   </div>
 
   <h2>Keep your schedule in one place</h2>
-  <p>The <a href="https://hellalhouda23-glitch.github.io/shiftflow/">ShiftFlow shift calendar app</a> stores your pattern on your own phone — no account, no sign-up — and works offline. Use it together with this calculator: plan the rotation here, then carry it with you.</p>
+  <p>The <a href="./">ShiftFlow shift calendar app</a> stores your pattern on your own phone — no account, no sign-up — and works offline. Use it together with this calculator: plan the rotation here, then carry it with you.</p>
 
   <footer>
     <p>Panama Schedule Calculator — free, no sign-up, works offline. © <span id="year"></span> ShiftFlow.</p>
@@ -371,9 +369,10 @@
         if (wd === 0 || wd === 6) weekend++;
       } else {
         off++;
+      }
 
-            var dLabel = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(item.date);
-      var badge = isOn ? (item.status === "D" ? "DAY" : "NIGHT") : "OFF";
+      var dLabel = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(item.date);
+        var badge = isOn ? (item.status === "D" ? "DAY" : "NIGHT") : "OFF";
 
       cell.innerHTML =
         '<span class="d">' + dLabel + "</span>" +
@@ -471,7 +470,7 @@
 
   $("year").textContent = String(new Date().getFullYear());
 
-  render();
+ render();
 })();
 </script>
 </body>
