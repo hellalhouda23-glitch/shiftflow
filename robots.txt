@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hellalhouda23-glitch.github.io/shiftflow/sitemap
+https://hellalhouda23-glitch.github.io/shiftflow/sitemap.xml
